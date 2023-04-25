@@ -1,33 +1,24 @@
-FROM node:19-alpine3.15 as dev
+FROM node:18-alpine3.17 as dev
 WORKDIR /app
 COPY package.json ./
 RUN yarn install
-CMD [ "yarn","start:dev" ]
+CMD [ "yarn","start" ]
 
-FROM node:19-alpine3.15 as dev-deps
+FROM node:18-alpine3.17 as dev-deps
 WORKDIR /app
 COPY package.json package.json
 RUN yarn install --frozen-lockfile
 
-
-FROM node:19-alpine3.15 as builder
+FROM node:18-alpine3.17 as builder
 WORKDIR /app
 COPY --from=dev-deps /app/node_modules ./node_modules
 COPY . .
 # RUN yarn test
 RUN yarn build
 
-FROM node:19-alpine3.15 as prod-deps
-WORKDIR /app
-COPY package.json package.json
-RUN yarn install --prod --frozen-lockfile
-
-
-FROM node:19-alpine3.15 as prod
-EXPOSE 3000
-WORKDIR /app
-ENV APP_VERSION=${APP_VERSION}
-COPY --from=prod-deps /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-
-CMD [ "node","dist/main.js"]
+FROM nginx:1.23.3 as prod
+COPY --from=builder /app/dist/front/ /usr/share/nginx/html
+COPY assets/ /usr/share/nginx/html/assets
+RUN rm /etc/nginx/conf.d/default.conf
+COPY nginx/nginx.conf /etc/nginx/conf.d
+CMD [ "nginx","-g","daemon off;" ]
